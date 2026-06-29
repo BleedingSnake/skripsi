@@ -1,19 +1,9 @@
 #!/usr/bin/env python3
-"""
-penjelasan_parser_final2.py
-
-Parses PASAL DEMI PASAL sections from cropped PDFs.
-Applies new rules:
- - Remove headers/footers: page numbers and hukumonline links
- - Remove empty Huruf/Angka rows
-"""
-
 import re
 import csv
 from pdfminer.high_level import extract_text
 from pathlib import Path
 
-# === CONFIG ===
 INPUT_FILES = [
     ("UU 11/2008", Path("UU_NO_11_2008-1_removed.pdf")),
     ("PP 71/2019", Path("PP_NO_71_2019_removed.pdf")),
@@ -21,26 +11,25 @@ INPUT_FILES = [
 ]
 OUTPUT_CSV = "penjelasan_master.csv"
 
-# === Regexes ===
+# regex
 RE_PASAL = re.compile(r'^Pasal\s+([0-9A-Za-z]+)$', re.IGNORECASE)
 RE_AYAT  = re.compile(r'^Ayat\s*\(\s*([0-9A-Za-z]+)\s*\)$', re.IGNORECASE)
 RE_PASAL_DEMI_PASAL = re.compile(r'^\s*(?:II\.\s*)?PASAL\s+DEMI\s+PASAL\s*$', re.IGNORECASE)
 
-# Standalone "Cukup jelas."
+# untuk"Cukup jelas."
 RE_STANDALONE_CUKUP = re.compile(r'^\s*cukup jelas\.?\s*$', re.IGNORECASE)
 
-# Huruf/Angka declarations
+# huruf/angka declarations
 RE_HURUF_ONLY = re.compile(r'^Huruf\s+[A-Za-z0-9]+\s*$', re.IGNORECASE)
 RE_ANGKA_ONLY = re.compile(r'^Angka\s+[A-Za-z0-9]+\s*$', re.IGNORECASE)
 
-# Headers and footers
+# headers footers
 RE_PAGE_FOOTER = re.compile(r'^\s*\d+\s*/\s*\d+\s*$')
 HUKUMONLINE_HEADERS = [
     "www.hukumonline.com",
     "www.hukumonline.com/pusatdata"
 ]
 
-# === Helpers ===
 def extract_lines_from_pdf(path: Path):
     raw = extract_text(str(path))
     return [ln.strip() for ln in raw.splitlines() if ln.strip()]
@@ -70,7 +59,7 @@ def is_cukup(line: str):
 def is_empty_huruf_or_angka(line: str):
     return bool(RE_HURUF_ONLY.match(line) or RE_ANGKA_ONLY.match(line))
 
-# === MAIN PARSER ===
+# main
 def parse_penjelasan(source_name: str, pdf_path: Path, writer):
 
     lines = extract_lines_from_pdf(pdf_path)
@@ -78,7 +67,7 @@ def parse_penjelasan(source_name: str, pdf_path: Path, writer):
         print(f"[WARN] No text in {pdf_path}")
         return
 
-    # Remove headers/footers FIRST
+    # remove headers/footers FIRST
     clean_lines = []
     for ln in lines:
         if is_header_or_footer(ln):
@@ -86,7 +75,7 @@ def parse_penjelasan(source_name: str, pdf_path: Path, writer):
         clean_lines.append(ln)
     lines = clean_lines
 
-    # Find PASAL DEMI PASAL start
+    # find PASAL DEMI PASAL start
     start_idx = None
     for i, ln in enumerate(lines):
         if is_pasaldemic(ln):
@@ -121,9 +110,9 @@ def parse_penjelasan(source_name: str, pdf_path: Path, writer):
     while i < len(lines):
         ln = lines[i]
 
-        # Skip empty Huruf/Angka lines (new rule)
+        # skip empty Huruf/Angka lines (new rule)
         if is_empty_huruf_or_angka(ln):
-            # But only skip if next line is NOT real explanation
+            # only skip if next line is NOT real explanation
             next_ln = lines[i + 1] if i + 1 < len(lines) else ""
             if (
                 match_pasal(next_ln) or
@@ -135,7 +124,7 @@ def parse_penjelasan(source_name: str, pdf_path: Path, writer):
                 i += 1
                 continue
 
-        # Detect Pasal
+        # detect Pasal
         p = match_pasal(ln)
         if p:
             flush()
@@ -145,7 +134,7 @@ def parse_penjelasan(source_name: str, pdf_path: Path, writer):
             i += 1
             continue
 
-        # Detect Ayat
+        # detect Ayat
         a = match_ayat(ln)
         if a:
             flush()
@@ -154,12 +143,12 @@ def parse_penjelasan(source_name: str, pdf_path: Path, writer):
             i += 1
             continue
 
-        # Standalone "Cukup jelas."
+        # "Cukup jelas."
         if is_cukup(ln):
             i += 1
             continue
 
-        # Normal text
+        # normal text
         if current_pasal:
             buffer.append(ln)
 
@@ -167,7 +156,7 @@ def parse_penjelasan(source_name: str, pdf_path: Path, writer):
 
     flush()
 
-# === ENTRY POINT ===
+# start here
 def main():
     with open(OUTPUT_CSV, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
